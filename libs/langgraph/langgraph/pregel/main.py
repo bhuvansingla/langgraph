@@ -2613,6 +2613,7 @@ class Pregel(
                     loop.config[CONF][CONFIG_KEY_STREAM] = loop.stream
                 # enable concurrent streaming
                 get_waiter: Callable[[], concurrent.futures.Future[None]] | None = None
+                is_ready: Callable[[], bool] | None = None
                 if (
                     self.stream_eager
                     or subgraphs
@@ -2635,6 +2636,9 @@ class Pregel(
                         else:
                             return waiter
 
+                    def is_ready() -> bool:
+                        return not stream.empty()
+
                 # Similarly to Bulk Synchronous Parallel / Pregel model
                 # computation proceeds in steps, while there are channel updates.
                 # Channel updates from step N are only visible in step N+1
@@ -2647,6 +2651,7 @@ class Pregel(
                         [t for t in loop.tasks.values() if not t.writes],
                         timeout=self.step_timeout,
                         get_waiter=get_waiter,
+                        is_ready=is_ready,
                         schedule_task=loop.accept_push,
                     ):
                         # emit output
@@ -2925,6 +2930,7 @@ class Pregel(
                     )
                 # enable concurrent streaming
                 get_waiter: Callable[[], asyncio.Task[None]] | None = None
+                is_ready: Callable[[], bool] | None = None
                 _cleanup_waiter: Callable[[], Awaitable[None]] | None = None
                 if (
                     self.stream_eager
@@ -2947,6 +2953,9 @@ class Pregel(
 
                             waiter.add_done_callback(_clear)
                         return waiter
+
+                    def is_ready() -> bool:
+                        return not stream.empty()
 
                     async def _cleanup_waiter() -> None:
                         """Wake pending waiter and/or cancel+await to avoid pending tasks."""
@@ -2975,6 +2984,7 @@ class Pregel(
                             [t for t in loop.tasks.values() if not t.writes],
                             timeout=self.step_timeout,
                             get_waiter=get_waiter,
+                            is_ready=is_ready,
                             schedule_task=loop.aaccept_push,
                         ):
                             # emit output

@@ -145,6 +145,7 @@ class PregelRunner:
         timeout: float | None = None,
         retry_policy: Sequence[RetryPolicy] | None = None,
         get_waiter: Callable[[], concurrent.futures.Future[None]] | None = None,
+        is_ready: Callable[[], bool] | None = None,
         schedule_task: Callable[
             [PregelExecutableTask, int, Call | None],
             PregelExecutableTask | None,
@@ -226,6 +227,11 @@ class PregelRunner:
         # yield updates/debug output as each task finishes
         end_time = timeout + time.monotonic() if timeout else None
         while len(futures) > (1 if get_waiter is not None else 0):
+            # if there are items ready (e.g., messages in queue), yield immediately
+            # without waiting for futures, to maintain low-latency streaming
+            if is_ready is not None and is_ready():
+                yield
+                continue
             done, inflight = concurrent.futures.wait(
                 futures,
                 return_when=concurrent.futures.FIRST_COMPLETED,
@@ -277,6 +283,7 @@ class PregelRunner:
         timeout: float | None = None,
         retry_policy: Sequence[RetryPolicy] | None = None,
         get_waiter: Callable[[], asyncio.Future[None]] | None = None,
+        is_ready: Callable[[], bool] | None = None,
         schedule_task: Callable[
             [PregelExecutableTask, int, Call | None],
             Awaitable[PregelExecutableTask | None],
@@ -374,6 +381,11 @@ class PregelRunner:
         # yield updates/debug output as each task finishes
         end_time = timeout + loop.time() if timeout else None
         while len(futures) > (1 if get_waiter is not None else 0):
+            # if there are items ready (e.g., messages in queue), yield immediately
+            # without waiting for futures, to maintain low-latency streaming
+            if is_ready is not None and is_ready():
+                yield
+                continue
             done, inflight = await asyncio.wait(
                 futures,
                 return_when=asyncio.FIRST_COMPLETED,
