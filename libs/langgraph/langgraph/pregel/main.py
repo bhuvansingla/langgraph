@@ -3256,6 +3256,7 @@ def _output(
     getter: Callable[[], tuple[tuple[str, ...], str, Any]],
     empty_exc: type[Exception],
 ) -> Iterator:
+    buffer: list = []
     while True:
         try:
             ns, mode, payload = getter()
@@ -3283,13 +3284,15 @@ def _output(
                 )
         if mode in stream_mode:
             if stream_subgraphs and isinstance(stream_mode, list):
-                yield (ns, mode, payload)
+                buffer.append((ns, mode, payload))
             elif isinstance(stream_mode, list):
-                yield (mode, payload)
+                buffer.append((mode, payload))
             elif stream_subgraphs:
-                yield (ns, payload)
+                buffer.append((ns, payload))
             else:
-                yield payload
+                buffer.append(payload)
+    if buffer:
+        yield buffer
 
 
 def _coerce_context(
